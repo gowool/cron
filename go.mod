@@ -4,15 +4,14 @@ go 1.22.1
 
 require (
 	github.com/go-co-op/gocron-redis-lock/v2 v2.0.1
-	github.com/go-co-op/gocron/v2 v2.2.6
+	github.com/go-co-op/gocron/v2 v2.2.9
 	github.com/go-redsync/redsync/v4 v4.12.1
 	github.com/google/uuid v1.6.0
-	github.com/gowool/cr v0.0.0-20240202104244-f209468bbb0c
 	github.com/redis/go-redis/v9 v9.5.1
-	github.com/samber/lo v1.39.0
 	go.opentelemetry.io/otel v1.24.0
 	go.opentelemetry.io/otel/metric v1.24.0
 	go.opentelemetry.io/otel/trace v1.24.0
+	go.uber.org/zap v1.27.0
 )
 
 require (
@@ -24,5 +23,6 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/jonboulle/clockwork v0.4.0 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
-	golang.org/x/exp v0.0.0-20240318143956-a85f2c67cd81 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
+	golang.org/x/exp v0.0.0-20240325151524-a685a6edb6d8 // indirect
 )

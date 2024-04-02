@@ -4,12 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"github.com/go-co-op/gocron/v2"
 	"github.com/google/uuid"
-	"github.com/samber/lo"
+	"go.uber.org/zap"
 )
 
 type Syncer interface {
@@ -17,36 +16,38 @@ type Syncer interface {
 }
 
 type JobSyncer struct {
-	repository Repository
-	resolver   Resolver
-	logger     *slog.Logger
+	storage  Storage
+	resolver Resolver
+	logger   *zap.Logger
 }
 
-func NewSyncer(repository Repository, resolver Resolver, logger *slog.Logger) *JobSyncer {
+func NewSyncer(storage Storage, resolver Resolver, logger *zap.Logger) *JobSyncer {
 	return &JobSyncer{
-		repository: repository,
-		resolver:   resolver,
-		logger:     logger.WithGroup("sync"),
+		storage:  storage,
+		resolver: resolver,
+		logger:   logger.Named("sync"),
 	}
 }
 
 func (syncer JobSyncer) Sync(ctx context.Context, s gocron.Scheduler) {
 	p := &processor{
-		s:      s,
-		syncer: syncer,
-		cronJobs: lo.SliceToMap(s.Jobs(), func(item gocron.Job) (string, gocron.Job) {
-			return item.Name(), item
-		}),
+		s:        s,
+		syncer:   syncer,
+		cronJobs: make(map[string]gocron.Job),
+	}
+
+	for _, item := range s.Jobs() {
+		p.cronJobs[item.Name()] = item
 	}
 
 	for i, size := 0, 20; ; i += size {
-		data, err := syncer.repository.FindEnabled(ctx, i, size)
+		data, err := syncer.storage.FindEnabled(ctx, i, size)
 		if err != nil {
 			if isCanceled(ctx) {
 				return
 			}
 
-			syncer.logger.Error("error db find jobs", "error", err)
+			syncer.logger.Error("error db find jobs", zap.Error(err))
 
 			return
 		}
@@ -57,7 +58,7 @@ func (syncer JobSyncer) Sync(ctx context.Context, s gocron.Scheduler) {
 					return
 				}
 
-				syncer.logger.Error("error due to sync a job", "job_id", item.ID, "type", item.Type, "error", err)
+				syncer.logger.Error("error due to sync a job", zap.Any("job_id", item.ID), zap.Any("type", item.Type), zap.Error(err))
 			}
 		}
 
@@ -68,7 +69,7 @@ func (syncer JobSyncer) Sync(ctx context.Context, s gocron.Scheduler) {
 
 	for _, job := range p.cronJobs {
 		if err := s.RemoveJob(job.ID()); err != nil {
-			syncer.logger.Error("error remove job", "job_id", job.Name(), "error", err)
+			syncer.logger.Error("error remove job", zap.String("job_id", job.Name()), zap.Error(err))
 		}
 	}
 }

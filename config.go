@@ -3,8 +3,6 @@ package cron
 import (
 	"runtime"
 	"time"
-
-	"github.com/samber/lo"
 )
 
 type LockerConfig struct {
@@ -39,15 +37,18 @@ type LockerConfig struct {
 
 func (c *LockerConfig) InitDefaults() {
 	if c.Tries == nil {
-		c.Tries = lo.ToPtr(32)
+		tries := 32
+		c.Tries = &tries
 	}
 
 	if c.DriftFactor == nil {
-		c.DriftFactor = lo.ToPtr(0.01)
+		drift := 0.01
+		c.DriftFactor = &drift
 	}
 
 	if c.TimeoutFactor == nil {
-		c.TimeoutFactor = lo.ToPtr(0.05)
+		timeout := 0.05
+		c.TimeoutFactor = &timeout
 	}
 
 	if c.Expiry == 0 {

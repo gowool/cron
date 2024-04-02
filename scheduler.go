@@ -2,7 +2,6 @@ package cron
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"github.com/go-co-op/gocron-redis-lock/v2"
@@ -10,6 +9,7 @@ import (
 	"github.com/go-redsync/redsync/v4"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 )
 
 type scheduler struct {
@@ -27,7 +27,7 @@ func (disablePingUniversalClient) Ping(ctx context.Context) *redis.StatusCmd {
 	return redis.NewStatusCmd(ctx)
 }
 
-func NewScheduler(client redis.UniversalClient, jobSyncer Syncer, config Config, logger *slog.Logger) (gocron.Scheduler, error) {
+func NewScheduler(client redis.UniversalClient, jobSyncer Syncer, config Config, logger *zap.Logger) (gocron.Scheduler, error) {
 	locker, _ := redislock.NewRedisLocker(
 		disablePingUniversalClient{UniversalClient: client},
 		redsync.WithTries(*config.Locker.Tries),
@@ -45,18 +45,18 @@ func NewScheduler(client redis.UniversalClient, jobSyncer Syncer, config Config,
 		gocron.WithDistributedLocker(locker),
 		gocron.WithStopTimeout(config.StopTimeout),
 		gocron.WithLimitConcurrentJobs(config.Limit, gocron.LimitModeReschedule),
-		gocron.WithLogger(logger),
+		gocron.WithLogger(Logger{l: logger}),
 		gocron.WithGlobalJobOptions(
 			gocron.WithSingletonMode(gocron.LimitModeReschedule),
 			gocron.WithEventListeners(
-				gocron.BeforeJobRuns(func(jobID uuid.UUID, jobName string) {
-					logger.WithGroup("job").Info("job start running", "id", jobID, "name", jobName)
+				gocron.BeforeJobRuns(func(id uuid.UUID, name string) {
+					logger.Named("job").Info("job start running", zap.Any("job_id", id), zap.String("job_name", name))
 				}),
-				gocron.AfterJobRuns(func(jobID uuid.UUID, jobName string) {
-					logger.WithGroup("job").Info("job stop running", "id", jobID, "name", jobName)
+				gocron.AfterJobRuns(func(id uuid.UUID, name string) {
+					logger.Named("job").Info("job stop running", zap.Any("job_id", id), zap.String("job_name", name))
 				}),
-				gocron.AfterJobRunsWithError(func(jobID uuid.UUID, jobName string, err error) {
-					logger.WithGroup("job").Error("job stop running with error", "id", jobID, "name", jobName, "error", err)
+				gocron.AfterJobRunsWithError(func(id uuid.UUID, name string, err error) {
+					logger.Named("job").Error("job stop running with error", zap.Any("job_id", id), zap.String("job_name", name), zap.Error(err))
 				}),
 			),
 		),

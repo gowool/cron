@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/go-co-op/gocron/v2"
-	"github.com/samber/lo"
 )
 
 var _ Resolver = (*TaskResolver)(nil)
@@ -36,11 +35,11 @@ type TaskResolver struct {
 }
 
 func NewResolver(tasks ...Task) *TaskResolver {
-	return &TaskResolver{
-		tasks: lo.SliceToMap(tasks, func(item Task) (JobType, Task) {
-			return item.Type(), item
-		}),
+	r := &TaskResolver{tasks: make(map[JobType]Task)}
+	for _, item := range tasks {
+		r.tasks[item.Type()] = item
 	}
+	return r
 }
 
 func (r *TaskResolver) Middleware(middlewares ...Middleware) {

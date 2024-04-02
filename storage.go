@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/gowool/cr"
 )
 
 type JobType string
@@ -26,10 +25,6 @@ type Job struct {
 	Updated time.Time       `json:"updated,omitempty"`
 }
 
-type Repository interface {
-	Find(ctx context.Context, criteria *cr.Criteria) ([]*Job, int, error)
+type Storage interface {
 	FindEnabled(ctx context.Context, offset, size int) ([]*Job, error)
-	FindByID(ctx context.Context, id uuid.UUID) (*Job, error)
-	DeleteByID(ctx context.Context, id uuid.UUID) error
-	Save(ctx context.Context, job *Job) error
 }
