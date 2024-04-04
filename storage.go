@@ -26,5 +26,5 @@ type Job struct {
 }
 
 type Storage interface {
-	FindEnabled(ctx context.Context, offset, size int) ([]*Job, error)
+	FindEnabled(ctx context.Context, offset, size int) ([]Job, error)
 }

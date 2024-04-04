@@ -80,7 +80,7 @@ type processor struct {
 	cronJobs map[string]gocron.Job
 }
 
-func (p *processor) process(ctx context.Context, job *Job) error {
+func (p *processor) process(ctx context.Context, job Job) error {
 	task, err := p.resolve(ctx, job)
 	if err != nil {
 		return err
@@ -98,7 +98,7 @@ func (p *processor) isUpdate(name uuid.UUID) bool {
 	return ok
 }
 
-func (p *processor) update(task gocron.Task, job *Job) error {
+func (p *processor) update(task gocron.Task, job Job) error {
 	name := job.ID.String()
 	cronJob := p.cronJobs[name]
 	delete(p.cronJobs, name)
@@ -114,7 +114,7 @@ func (p *processor) update(task gocron.Task, job *Job) error {
 	return nil
 }
 
-func (p *processor) add(task gocron.Task, job *Job) error {
+func (p *processor) add(task gocron.Task, job Job) error {
 	if _, err := p.s.NewJob(definition(job.Crontab), task, options(job)...); err != nil {
 		return fmt.Errorf("error due to add cron job: %w", err)
 	}
@@ -122,7 +122,7 @@ func (p *processor) add(task gocron.Task, job *Job) error {
 	return nil
 }
 
-func (p *processor) resolve(ctx context.Context, job *Job) (gocron.Task, error) {
+func (p *processor) resolve(ctx context.Context, job Job) (gocron.Task, error) {
 	task, err := p.syncer.resolver.Resolve(ctx, job)
 	if err != nil {
 		return nil, fmt.Errorf("error due to resove job task: %w", err)
@@ -134,14 +134,14 @@ func definition(crontab string) gocron.JobDefinition {
 	return gocron.CronJob(crontab, strings.Count(crontab, " ") == 5)
 }
 
-func options(job *Job) []gocron.JobOption {
+func options(job Job) []gocron.JobOption {
 	return []gocron.JobOption{
 		gocron.WithName(job.ID.String()),
 		gocron.WithTags(tags(job)...),
 	}
 }
 
-func tags(job *Job) []string {
+func tags(job Job) []string {
 	t := make([]string, 0, 3+len(job.Tags))
 	t = append(t, "job", job.ID.String(), job.Type.String())
 	t = append(t, job.Tags...)

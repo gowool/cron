@@ -27,7 +27,7 @@ func MetricsMiddleware() (Middleware, error) {
 	}
 
 	return func(next MiddlewareFunc) MiddlewareFunc {
-		return func(ctx context.Context, job *Job) error {
+		return func(ctx context.Context, job Job) error {
 			start := time.Now()
 
 			err := next(ctx, job)
@@ -50,7 +50,7 @@ func TracingMiddleware() Middleware {
 	tracer := otel.GetTracerProvider().Tracer(instrumName)
 
 	return func(next MiddlewareFunc) MiddlewareFunc {
-		return func(ctx context.Context, job *Job) error {
+		return func(ctx context.Context, job Job) error {
 			ctx, span := tracer.Start(ctx, fmt.Sprintf("execute.Job(%s)", job.Type.String()),
 				trace.WithSpanKind(trace.SpanKindInternal),
 				trace.WithAttributes(

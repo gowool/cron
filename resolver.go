@@ -15,7 +15,7 @@ var ErrTaskNotFound = errors.New("task not found")
 
 type Resolver interface {
 	Middleware(middlewares ...Middleware)
-	Resolve(ctx context.Context, job *Job) (gocron.Task, error)
+	Resolve(ctx context.Context, job Job) (gocron.Task, error)
 }
 
 type Task interface {
@@ -24,7 +24,7 @@ type Task interface {
 }
 
 type (
-	MiddlewareFunc func(ctx context.Context, job *Job) error
+	MiddlewareFunc func(ctx context.Context, job Job) error
 	Middleware     func(next MiddlewareFunc) MiddlewareFunc
 )
 
@@ -49,12 +49,12 @@ func (r *TaskResolver) Middleware(middlewares ...Middleware) {
 	r.mdws = append(r.mdws, middlewares...)
 }
 
-func (r *TaskResolver) Resolve(ctx context.Context, job *Job) (gocron.Task, error) {
+func (r *TaskResolver) Resolve(ctx context.Context, job Job) (gocron.Task, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if task, ok := r.tasks[job.Type]; ok {
-		var next MiddlewareFunc = func(ctx context.Context, job *Job) error {
+		var next MiddlewareFunc = func(ctx context.Context, job Job) error {
 			return task.Execute(ctx, job.Payload)
 		}
 
