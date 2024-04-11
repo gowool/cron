@@ -35,7 +35,7 @@ func MetricsMiddleware() (Middleware, error) {
 			dur := time.Since(start)
 
 			attrs := make([]attribute.KeyValue, 0, 3)
-			attrs = append(attrs, attribute.String("job_name", job.ID.String()))
+			attrs = append(attrs, attribute.String("job_id", job.ID))
 			attrs = append(attrs, attribute.String("job_type", job.Type.String()))
 			attrs = append(attrs, statusAttr(err))
 
@@ -54,7 +54,7 @@ func TracingMiddleware() Middleware {
 			ctx, span := tracer.Start(ctx, fmt.Sprintf("execute.Job(%s)", job.Type.String()),
 				trace.WithSpanKind(trace.SpanKindInternal),
 				trace.WithAttributes(
-					attribute.String("job_name", job.ID.String()),
+					attribute.String("job_id", job.ID),
 					attribute.String("job_type", job.Type.String()),
 				),
 			)

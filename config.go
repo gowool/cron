@@ -7,13 +7,13 @@ import (
 
 type LockerConfig struct {
 	// Tries can be used to set the number of times lock acquire is attempted.
-	Tries *int `cfg:"tries" json:"tries,omitempty" yaml:"tries,omitempty" bson:"tries,omitempty"`
+	Tries int `cfg:"tries" json:"tries,omitempty" yaml:"tries,omitempty" bson:"tries,omitempty"`
 
 	// DriftFactor can be used to set the clock drift factor.
-	DriftFactor *float64 `cfg:"drift_factor,omitempty" json:"drift_factor,omitempty" yaml:"drift_factor,omitempty" bson:"drift_factor,omitempty"`
+	DriftFactor float64 `cfg:"drift_factor,omitempty" json:"drift_factor,omitempty" yaml:"drift_factor,omitempty" bson:"drift_factor,omitempty"`
 
 	// TimeoutFactor can be used to set the timeout factor.
-	TimeoutFactor *float64 `cfg:"timeout_factor,omitempty" json:"timeout_factor,omitempty" yaml:"timeout_factor,omitempty" bson:"timeout_factor,omitempty"`
+	TimeoutFactor float64 `cfg:"timeout_factor,omitempty" json:"timeout_factor,omitempty" yaml:"timeout_factor,omitempty" bson:"timeout_factor,omitempty"`
 
 	// Expiry can be used to set the expiry of a mutex to the given value.
 	Expiry time.Duration `cfg:"expiry,omitempty" json:"expiry,omitempty" yaml:"expiry,omitempty" bson:"expiry,omitempty"`
@@ -36,19 +36,16 @@ type LockerConfig struct {
 }
 
 func (c *LockerConfig) InitDefaults() {
-	if c.Tries == nil {
-		tries := 32
-		c.Tries = &tries
+	if c.Tries == 0 {
+		c.Tries = 32
 	}
 
-	if c.DriftFactor == nil {
-		drift := 0.01
-		c.DriftFactor = &drift
+	if c.DriftFactor == 0.0 {
+		c.DriftFactor = 0.01
 	}
 
-	if c.TimeoutFactor == nil {
-		timeout := 0.05
-		c.TimeoutFactor = &timeout
+	if c.TimeoutFactor == 0.0 {
+		c.TimeoutFactor = 0.05
 	}
 
 	if c.Expiry == 0 {

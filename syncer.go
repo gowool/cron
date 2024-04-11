@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/go-co-op/gocron/v2"
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -16,14 +15,14 @@ type Syncer interface {
 }
 
 type JobSyncer struct {
-	storage  Storage
+	store    Store
 	resolver Resolver
 	logger   *zap.Logger
 }
 
-func NewSyncer(storage Storage, resolver Resolver, logger *zap.Logger) *JobSyncer {
+func NewSyncer(store Store, resolver Resolver, logger *zap.Logger) *JobSyncer {
 	return &JobSyncer{
-		storage:  storage,
+		store:    store,
 		resolver: resolver,
 		logger:   logger.Named("sync"),
 	}
@@ -41,7 +40,7 @@ func (syncer JobSyncer) Sync(ctx context.Context, s gocron.Scheduler) {
 	}
 
 	for i, size := 0, 20; ; i += size {
-		data, err := syncer.storage.FindEnabled(ctx, i, size)
+		data, err := syncer.store.GetJobs(ctx, i, size)
 		if err != nil {
 			if isCanceled(ctx) {
 				return
@@ -93,13 +92,13 @@ func (p *processor) process(ctx context.Context, job Job) error {
 	return p.add(task, job)
 }
 
-func (p *processor) isUpdate(name uuid.UUID) bool {
-	_, ok := p.cronJobs[name.String()]
+func (p *processor) isUpdate(name string) bool {
+	_, ok := p.cronJobs[name]
 	return ok
 }
 
 func (p *processor) update(task gocron.Task, job Job) error {
-	name := job.ID.String()
+	name := job.ID
 	cronJob := p.cronJobs[name]
 	delete(p.cronJobs, name)
 
@@ -136,14 +135,14 @@ func definition(crontab string) gocron.JobDefinition {
 
 func options(job Job) []gocron.JobOption {
 	return []gocron.JobOption{
-		gocron.WithName(job.ID.String()),
+		gocron.WithName(job.ID),
 		gocron.WithTags(tags(job)...),
 	}
 }
 
 func tags(job Job) []string {
 	t := make([]string, 0, 3+len(job.Tags))
-	t = append(t, "job", job.ID.String(), job.Type.String())
+	t = append(t, "job", job.ID, job.Type.String())
 	t = append(t, job.Tags...)
 
 	return t

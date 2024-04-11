@@ -4,9 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/go-co-op/gocron-redis-lock/v2"
 	"github.com/go-co-op/gocron/v2"
-	"github.com/go-redsync/redsync/v4"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
@@ -27,40 +25,34 @@ func (disablePingUniversalClient) Ping(ctx context.Context) *redis.StatusCmd {
 	return redis.NewStatusCmd(ctx)
 }
 
-func NewScheduler(client redis.UniversalClient, jobSyncer Syncer, config Config, logger *zap.Logger) (gocron.Scheduler, error) {
-	locker, _ := redislock.NewRedisLocker(
-		disablePingUniversalClient{UniversalClient: client},
-		redsync.WithTries(*config.Locker.Tries),
-		redsync.WithDriftFactor(*config.Locker.DriftFactor),
-		redsync.WithTimeoutFactor(*config.Locker.TimeoutFactor),
-		redsync.WithExpiry(config.Locker.Expiry),
-		redsync.WithRetryDelay(config.Locker.RetryDelay),
-		redsync.WithValue(config.Locker.Value),
-		redsync.WithFailFast(config.Locker.FailFast),
-		redsync.WithShufflePools(config.Locker.ShufflePools),
-	)
+func NewSchedulerWithRedisLocker(config Config, jobSyncer Syncer, client redis.UniversalClient, logger *zap.Logger, opts ...gocron.SchedulerOption) (gocron.Scheduler, error) {
+	o := append(opts, gocron.WithDistributedLocker(NewRedisLocker(*config.Locker, client)))
+	return NewScheduler(config, jobSyncer, logger, o...)
+}
 
-	s, err := gocron.NewScheduler(
+func NewScheduler(config Config, jobSyncer Syncer, logger *zap.Logger, opts ...gocron.SchedulerOption) (gocron.Scheduler, error) {
+	o := []gocron.SchedulerOption{
 		gocron.WithLocation(time.UTC),
-		gocron.WithDistributedLocker(locker),
 		gocron.WithStopTimeout(config.StopTimeout),
 		gocron.WithLimitConcurrentJobs(config.Limit, gocron.LimitModeReschedule),
 		gocron.WithLogger(Logger{l: logger}),
 		gocron.WithGlobalJobOptions(
 			gocron.WithSingletonMode(gocron.LimitModeReschedule),
 			gocron.WithEventListeners(
-				gocron.BeforeJobRuns(func(id uuid.UUID, name string) {
-					logger.Named("job").Info("job start running", zap.Any("job_id", id), zap.String("job_name", name))
+				gocron.BeforeJobRuns(func(_ uuid.UUID, name string) {
+					logger.Named("job").Info("job start running", zap.String("id", name))
 				}),
-				gocron.AfterJobRuns(func(id uuid.UUID, name string) {
-					logger.Named("job").Info("job stop running", zap.Any("job_id", id), zap.String("job_name", name))
+				gocron.AfterJobRuns(func(_ uuid.UUID, name string) {
+					logger.Named("job").Info("job stop running", zap.String("id", name))
 				}),
-				gocron.AfterJobRunsWithError(func(id uuid.UUID, name string, err error) {
-					logger.Named("job").Error("job stop running with error", zap.Any("job_id", id), zap.String("job_name", name), zap.Error(err))
+				gocron.AfterJobRunsWithError(func(_ uuid.UUID, name string, err error) {
+					logger.Named("job").Error("job stop running with error", zap.String("id", name), zap.Error(err))
 				}),
 			),
 		),
-	)
+	}
+
+	s, err := gocron.NewScheduler(append(o, opts...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +97,6 @@ func (s *scheduler) Shutdown() error {
 
 func (s *scheduler) run(ctx context.Context) {
 	t := time.NewTicker(s.syncDuration)
-
 	defer t.Stop()
 
 	s.jobSyncer.Sync(ctx, s)
