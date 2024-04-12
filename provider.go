@@ -12,7 +12,9 @@ func (t JobType) String() string {
 }
 
 type Job struct {
-	ID      string    `json:"id,omitempty"`
+	// Name of the job aka ID, should be unique
+	Name string `json:"name,omitempty"`
+	// Type of the job, it's a string representation of JobType
 	Type    JobType   `json:"type,omitempty"`
 	Crontab string    `json:"crontab,omitempty"`
 	Tags    []string  `json:"tags,omitempty"`
@@ -20,6 +22,6 @@ type Job struct {
 	Updated time.Time `json:"updated,omitempty"`
 }
 
-type Store interface {
+type Provider interface {
 	GetJobs(ctx context.Context, offset, size int) ([]Job, error)
 }

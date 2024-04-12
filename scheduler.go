@@ -2,6 +2,7 @@ package cron
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
@@ -40,13 +41,13 @@ func NewScheduler(config Config, jobSyncer Syncer, logger *zap.Logger, opts ...g
 			gocron.WithSingletonMode(gocron.LimitModeReschedule),
 			gocron.WithEventListeners(
 				gocron.BeforeJobRuns(func(_ uuid.UUID, name string) {
-					logger.Named("job").Info("job start running", zap.String("id", name))
+					logger.Named("job").Info("job start running", zap.String("name", name))
 				}),
 				gocron.AfterJobRuns(func(_ uuid.UUID, name string) {
-					logger.Named("job").Info("job stop running", zap.String("id", name))
+					logger.Named("job").Info("job stop running", zap.String("name", name))
 				}),
 				gocron.AfterJobRunsWithError(func(_ uuid.UUID, name string, err error) {
-					logger.Named("job").Error("job stop running with error", zap.String("id", name), zap.Error(err))
+					logger.Named("job").Error("job stop running with error", zap.String("name", name), zap.Error(err))
 				}),
 			),
 		),
@@ -65,8 +66,8 @@ func NewScheduler(config Config, jobSyncer Syncer, logger *zap.Logger, opts ...g
 }
 
 func (s *scheduler) Start() {
-	var ctx context.Context
-	ctx, s.cancel = context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancel = sync.OnceFunc(cancel)
 
 	s.Scheduler.Start()
 
@@ -74,12 +75,7 @@ func (s *scheduler) Start() {
 }
 
 func (s *scheduler) StopJobs() error {
-	defer func() {
-		if s.cancel != nil {
-			s.cancel()
-			s.cancel = nil
-		}
-	}()
+	defer s.cancel()
 
 	return s.Scheduler.StopJobs()
 }

@@ -15,14 +15,14 @@ type Syncer interface {
 }
 
 type JobSyncer struct {
-	store    Store
+	provider Provider
 	resolver Resolver
 	logger   *zap.Logger
 }
 
-func NewSyncer(store Store, resolver Resolver, logger *zap.Logger) *JobSyncer {
+func NewSyncer(provider Provider, resolver Resolver, logger *zap.Logger) *JobSyncer {
 	return &JobSyncer{
-		store:    store,
+		provider: provider,
 		resolver: resolver,
 		logger:   logger.Named("sync"),
 	}
@@ -40,7 +40,7 @@ func (syncer JobSyncer) Sync(ctx context.Context, s gocron.Scheduler) {
 	}
 
 	for i, size := 0, 20; ; i += size {
-		data, err := syncer.store.GetJobs(ctx, i, size)
+		data, err := syncer.provider.GetJobs(ctx, i, size)
 		if err != nil {
 			if isCanceled(ctx) {
 				return
@@ -57,7 +57,7 @@ func (syncer JobSyncer) Sync(ctx context.Context, s gocron.Scheduler) {
 					return
 				}
 
-				syncer.logger.Error("error due to sync a job", zap.Any("job_id", item.ID), zap.Any("type", item.Type), zap.Error(err))
+				syncer.logger.Error("error due to sync a job", zap.String("name", item.Name), zap.Any("type", item.Type), zap.Error(err))
 			}
 		}
 
@@ -68,7 +68,7 @@ func (syncer JobSyncer) Sync(ctx context.Context, s gocron.Scheduler) {
 
 	for _, job := range p.cronJobs {
 		if err := s.RemoveJob(job.ID()); err != nil {
-			syncer.logger.Error("error remove job", zap.String("job_id", job.Name()), zap.Error(err))
+			syncer.logger.Error("error remove job", zap.String("name", job.Name()), zap.Error(err))
 		}
 	}
 }
@@ -85,7 +85,7 @@ func (p *processor) process(ctx context.Context, job Job) error {
 		return err
 	}
 
-	if p.isUpdate(job.ID) {
+	if p.isUpdate(job.Name) {
 		return p.update(task, job)
 	}
 
@@ -97,8 +97,8 @@ func (p *processor) isUpdate(name string) bool {
 	return ok
 }
 
-func (p *processor) update(task gocron.Task, job Job) error {
-	name := job.ID
+func (p *processor) update(task Task, job Job) error {
+	name := job.Name
 	cronJob := p.cronJobs[name]
 	delete(p.cronJobs, name)
 
@@ -113,7 +113,7 @@ func (p *processor) update(task gocron.Task, job Job) error {
 	return nil
 }
 
-func (p *processor) add(task gocron.Task, job Job) error {
+func (p *processor) add(task Task, job Job) error {
 	if _, err := p.s.NewJob(definition(job.Crontab), task, options(job)...); err != nil {
 		return fmt.Errorf("error due to add cron job: %w", err)
 	}
@@ -121,7 +121,7 @@ func (p *processor) add(task gocron.Task, job Job) error {
 	return nil
 }
 
-func (p *processor) resolve(ctx context.Context, job Job) (gocron.Task, error) {
+func (p *processor) resolve(ctx context.Context, job Job) (Task, error) {
 	task, err := p.syncer.resolver.Resolve(ctx, job)
 	if err != nil {
 		return nil, fmt.Errorf("error due to resove job task: %w", err)
@@ -135,14 +135,14 @@ func definition(crontab string) gocron.JobDefinition {
 
 func options(job Job) []gocron.JobOption {
 	return []gocron.JobOption{
-		gocron.WithName(job.ID),
+		gocron.WithName(job.Name),
 		gocron.WithTags(tags(job)...),
 	}
 }
 
 func tags(job Job) []string {
 	t := make([]string, 0, 3+len(job.Tags))
-	t = append(t, "job", job.ID, job.Type.String())
+	t = append(t, "job", job.Name, job.Type.String())
 	t = append(t, job.Tags...)
 
 	return t

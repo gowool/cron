@@ -67,8 +67,6 @@ type Config struct {
 
 	Locker      *LockerConfig `cfg:"locker,omitempty" json:"locker,omitempty" yaml:"locker,omitempty" bson:"locker,omitempty"`
 	StopTimeout time.Duration `cfg:"stop_timeout,omitempty" json:"stop_timeout,omitempty" yaml:"stop_timeout,omitempty" bson:"stop_timeout,omitempty"`
-	Metrics     bool          `cfg:"metrics,omitempty" json:"metrics,omitempty" yaml:"metrics,omitempty"`
-	Tracing     bool          `cfg:"tracing,omitempty" json:"tracing,omitempty" yaml:"tracing,omitempty"`
 }
 
 func (c *Config) InitDefaults() {

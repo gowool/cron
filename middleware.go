@@ -14,7 +14,7 @@ import (
 
 const instrumName = "github.com/gowool/cron"
 
-func MetricsMiddleware() (Middleware, error) {
+func MetricsMiddleware() (MiddlewareFunc, error) {
 	meter := otel.GetMeterProvider().Meter(instrumName)
 
 	taskTime, err := meter.Float64Histogram(
@@ -26,7 +26,7 @@ func MetricsMiddleware() (Middleware, error) {
 		return nil, err
 	}
 
-	return func(next MiddlewareFunc) MiddlewareFunc {
+	return func(next TaskFunc) TaskFunc {
 		return func(ctx context.Context, job Job) error {
 			start := time.Now()
 
@@ -35,7 +35,7 @@ func MetricsMiddleware() (Middleware, error) {
 			dur := time.Since(start)
 
 			attrs := make([]attribute.KeyValue, 0, 3)
-			attrs = append(attrs, attribute.String("job_id", job.ID))
+			attrs = append(attrs, attribute.String("job_name", job.Name))
 			attrs = append(attrs, attribute.String("job_type", job.Type.String()))
 			attrs = append(attrs, statusAttr(err))
 
@@ -46,15 +46,15 @@ func MetricsMiddleware() (Middleware, error) {
 	}, nil
 }
 
-func TracingMiddleware() Middleware {
+func TracingMiddleware() MiddlewareFunc {
 	tracer := otel.GetTracerProvider().Tracer(instrumName)
 
-	return func(next MiddlewareFunc) MiddlewareFunc {
+	return func(next TaskFunc) TaskFunc {
 		return func(ctx context.Context, job Job) error {
-			ctx, span := tracer.Start(ctx, fmt.Sprintf("execute.Job(%s)", job.Type.String()),
+			ctx, span := tracer.Start(ctx, fmt.Sprintf("execute.Job(%s)", job.Type),
 				trace.WithSpanKind(trace.SpanKindInternal),
 				trace.WithAttributes(
-					attribute.String("job_id", job.ID),
+					attribute.String("job_name", job.Name),
 					attribute.String("job_type", job.Type.String()),
 				),
 			)
