@@ -98,7 +98,7 @@ func (p *processor) update(task Task, job Job) error {
 	cronJob := p.cronJobs[name]
 	delete(p.cronJobs, name)
 
-	if lastRun, err := cronJob.LastRun(); err != nil || lastRun.After(job.Updated) {
+	if lastRun, err := cronJob.LastRun(); err != nil || lastRun.IsZero() || lastRun.After(job.Updated) {
 		return nil
 	}
 
