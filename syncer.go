@@ -42,12 +42,9 @@ func (syncer JobSyncer) Sync(ctx context.Context, s gocron.Scheduler) {
 	for i, size := 0, 20; ; i += size {
 		data, err := syncer.provider.GetJobs(ctx, i, size)
 		if err != nil {
-			if isCanceled(ctx) {
-				return
+			if !isCanceled(ctx) {
+				syncer.logger.Error("error db find jobs", zap.Error(err))
 			}
-
-			syncer.logger.Error("error db find jobs", zap.Error(err))
-
 			return
 		}
 
@@ -56,7 +53,6 @@ func (syncer JobSyncer) Sync(ctx context.Context, s gocron.Scheduler) {
 				if isCanceled(ctx) {
 					return
 				}
-
 				syncer.logger.Error("error due to sync a job", zap.String("name", item.Name), zap.Any("type", item.Type), zap.Error(err))
 			}
 		}
@@ -102,10 +98,11 @@ func (p *processor) update(task Task, job Job) error {
 	cronJob := p.cronJobs[name]
 	delete(p.cronJobs, name)
 
-	if lastRun, err := cronJob.LastRun(); err != nil || !lastRun.Before(job.Updated) {
+	if lastRun, err := cronJob.LastRun(); err != nil || lastRun.After(job.Updated) {
 		return nil
 	}
 
+	p.syncer.logger.Debug("update cron job", zap.String("name", name))
 	if _, err := p.s.Update(cronJob.ID(), definition(job.Crontab), task, options(job)...); err != nil {
 		return fmt.Errorf("error due to update cron job: %w", err)
 	}
@@ -114,10 +111,10 @@ func (p *processor) update(task Task, job Job) error {
 }
 
 func (p *processor) add(task Task, job Job) error {
+	p.syncer.logger.Debug("add cron job", zap.String("name", job.Name))
 	if _, err := p.s.NewJob(definition(job.Crontab), task, options(job)...); err != nil {
 		return fmt.Errorf("error due to add cron job: %w", err)
 	}
-
 	return nil
 }
 
@@ -144,7 +141,6 @@ func tags(job Job) []string {
 	t := make([]string, 0, 3+len(job.Tags))
 	t = append(t, "job", job.Name, job.Type.String())
 	t = append(t, job.Tags...)
-
 	return t
 }
 

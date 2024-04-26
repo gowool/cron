@@ -41,6 +41,5 @@ func (r *TaskResolver) Resolve(ctx context.Context, job Job) (Task, error) {
 	if task, ok := r.tasks[job.Type]; ok {
 		return gocron.NewTask(task, ctx, job), nil
 	}
-
 	return nil, fmt.Errorf("%w: `%s`", ErrTaskNotFound, job.Type)
 }

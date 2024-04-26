@@ -95,8 +95,6 @@ func (s *scheduler) run(ctx context.Context) {
 	t := time.NewTicker(s.syncDuration)
 	defer t.Stop()
 
-	s.jobSyncer.Sync(ctx, s)
-
 	for {
 		select {
 		case <-ctx.Done():
